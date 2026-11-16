@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 from app.api.errors import register_exception_handlers
 from app.api.middleware import RequestContextMiddleware
-from app.api.routes import events, health
+from app.api.routes import booking, events, health
 from app.container import Container
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
@@ -36,6 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     api_prefix = "/api/v1"
     app.include_router(events.router, prefix=api_prefix)
+    app.include_router(booking.router, prefix=api_prefix)
     return app
 
 

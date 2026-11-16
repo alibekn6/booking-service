@@ -77,6 +77,28 @@ async def test_only_organizers_create_events(buyer: Actor, client: AsyncClient) 
     assert res.json()["error"]["code"] == "FORBIDDEN"
 
 
+async def test_seat_map_shows_status_and_per_category_summary(
+    organizer: Actor, actor: Any, client: AsyncClient
+) -> None:
+    event = await create_event(organizer, rows=2, seats_per_row=5)
+    held_buyer, sold_buyer = actor(), actor()
+    await held_buyer.hold(event.id, [event.seat("1", 1)])
+    sold = (await sold_buyer.hold(event.id, [event.seat("2", 1), event.seat("2", 2)])).json()
+    await sold_buyer.confirm(sold["id"])
+
+    seat_map = (await client.get(f"{API}/events/{event.id}/seats")).json()
+
+    by_pos = {(s["row"], s["number"]): s["status"] for s in seat_map["seats"]}
+    assert by_pos[("1", 1)] == "held"
+    assert by_pos[("2", 1)] == by_pos[("2", 2)] == "sold"
+    assert by_pos[("1", 2)] == "available"
+    summary = {c["code"]: (c["available_seats"], c["total_seats"]) for c in seat_map["categories"]}
+    assert summary == {"VIP": (4, 5), "STD": (3, 5)}
+    assert seat_map["generated_at"].endswith("Z")
+    card = (await client.get(f"{API}/events/{event.id}")).json()
+    assert {c["code"]: c["available_seats"] for c in card["categories"]} == {"VIP": 4, "STD": 3}
+
+
 async def test_unknown_event_is_404(client: AsyncClient) -> None:
     missing = "00000000-0000-0000-0000-000000000000"
     for path in (f"/events/{missing}", f"/events/{missing}/seats"):
